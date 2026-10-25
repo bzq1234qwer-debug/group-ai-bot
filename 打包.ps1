@@ -26,7 +26,7 @@ $include = @(
     'prepare-runtime.ps1', '启动.bat', '停止.bat', '准备运行环境.bat', '打包.ps1',
     '开机自启.bat', '取消自启.bat', '打包.bat',
     'package.json', 'pnpm-lock.yaml', 'tsconfig.json',
-    'README.md', '使用说明.txt', '.gitignore',
+    'README.md', '使用说明.txt', 'LICENSE', '.gitignore',
     'Dockerfile', 'docker-compose.yml', 'deploy.sh',
     '.env.example', 'config.example.json'
 )
