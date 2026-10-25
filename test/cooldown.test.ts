@@ -32,7 +32,8 @@ const policy = {
 
 test("刚回过话，别人立刻 @ 它 —— 不该被 20 秒冷却挡住", () => {
   const state = createTriggerState();
-  state.lastReplyAt.set(CONV, NOW - 5_000); // 5 秒前刚回过
+  // 正在聊天时冷却只有 4 秒，所以取 2 秒前（仍在冷却内） // 5 秒前刚回过
+    state.lastReplyAt.set(CONV, NOW - 2_000);
 
   const result = evaluateTrigger(make("@我 这个怎么弄", true), policy, state, NOW, () => 0);
   assert.equal(result.respond, true, `被挡住了：${result.reason}`);
@@ -40,8 +41,8 @@ test("刚回过话，别人立刻 @ 它 —— 不该被 20 秒冷却挡住", ()
 
 test("刚回过话，普通闲聊在冷却内仍然不接（防刷屏）", () => {
   const state = createTriggerState();
-  state.lastReplyAt.set(CONV, NOW - 5_000);
-  state.lastReplyAt.set(CONV, NOW - 5_000);
+  // 正在聊天时冷却只有 4 秒，所以取 2 秒前（仍在冷却内）
+  state.lastReplyAt.set(CONV, NOW - 2_000);
 
   const result = evaluateTrigger(make("今天天气不错"), policy, state, NOW, () => 1);
   assert.equal(result.respond, false);

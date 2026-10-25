@@ -145,29 +145,45 @@ test("interject：随机值很小时也压得住，不会见谁都接", () => {
   );
 });
 
-test("冷却期：普通消息用完整冷却，@ 它只挡 3 秒", () => {
-  const s = state();
+test("冷却：被点名挡 2 秒，正在聊天挡 4 秒", () => {
+  // 被 @：2 秒内挡住，2 秒后放行
+  const s1 = state();
   const p = policy({ mode: "always", cooldownSec: 10 });
+  assert.equal(evaluateTrigger(makeEnv("第一次"), p, s1, NOW).respond, true);
+  recordReply(s1, "qq:10001:group:30003", "20002", NOW);
 
+  const tooSoon = evaluateTrigger(makeEnv("马上又叫我"), p, s1, NOW + 1500);
+  assert.equal(tooSoon.respond, false);
+  assert.equal(tooSoon.reason, "cooldown");
+
+  const ok = evaluateTrigger(makeEnv("两秒后"), p, s1, NOW + 2500);
+  assert.equal(ok.respond, true);
+});
+
+test("冷却：刚说完话的对话里，别人接话不会被 12 秒卡住", () => {
+  const s = state();
+  const p = policy({ mode: "interject", cooldownSec: 12 });
   assert.equal(evaluateTrigger(makeEnv("第一次"), p, s, NOW).respond, true);
   recordReply(s, "qq:10001:group:30003", "20002", NOW);
 
-  // 没人 @ 它：按完整冷却挡
-  const plain = evaluateTrigger(
-    makeEnv("第二次", { mentions: { self: false, users: [], all: false } }),
+  // 3 秒后有人接着说：正在聊天，只挡 4 秒
+  const tooSoon = evaluateTrigger(
+    makeEnv("接着说", { mentions: { self: false, users: [], all: false } }),
+    p,
+    s,
+    NOW + 3000,
+  );
+  assert.equal(tooSoon.respond, false);
+
+  // 5 秒后：放行（不再像以前那样被 12 秒冷却闷死）
+  const ok = evaluateTrigger(
+    makeEnv("接着说", { mentions: { self: false, users: [], all: false } }),
     p,
     s,
     NOW + 5000,
+    () => 0.9,
   );
-  assert.equal(plain.respond, false);
-  assert.equal(plain.reason, "cooldown");
-
-  // 有人 @ 它：3 秒后就能回，否则群里两个人同时说话它会彻底哑掉
-  const mention = evaluateTrigger(makeEnv("第三次"), p, s, NOW + 5000);
-  assert.equal(mention.respond, true);
-
-  const tooSoon = evaluateTrigger(makeEnv("第四次"), p, s, NOW + 11_000 - 10_000);
-  assert.equal(tooSoon.respond, false);
+  assert.equal(ok.respond, true);
 });
 
 test("单用户每小时配额生效", () => {

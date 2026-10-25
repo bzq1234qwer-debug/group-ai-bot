@@ -131,7 +131,7 @@ function modeMatches(
     case "interject":
       // 私聊不需要"插话判断"，对方就是在跟你说话
       // 被直接 @ 也是明确在叫它，必须回，不能交给概率
-      if (priv || env.mentions.self) return true;
+      if (priv || env.mentions.self || env.replyTo?.senderIsSelf === true) return true;
       return shouldInterject(env, { ...(policy.interject ?? {}), inConversation }, rng);
     default:
       return false;
@@ -208,7 +208,7 @@ export function shouldInterject(
   if (env.mentions.all) score += 0.5;
 
   // 正在聊天：刚说过话的 2 分钟里，接话门槛自然更低
-  if (opt.inConversation) score += opt.momentumBonus ?? 0.45;
+  if (opt.inConversation) score += opt.momentumBonus ?? 0.65;
 
   return score >= threshold;
 }
@@ -245,7 +245,7 @@ export function evaluateTrigger(
 
   // 刚在这个群说过话（2 分钟内）就算"正在聊天"，接话门槛更低
   const lastForMomentum = state.lastReplyAt.get(env.convKey) ?? 0;
-  const inConversation = lastForMomentum > 0 && now - lastForMomentum < 120_000;
+  const inConversation = lastForMomentum > 0 && now - lastForMomentum < 180_000;
 
   if (!modeMatches(env, policy, rng, inConversation)) {
     return { respond: false, reason: "no_trigger_match" };
@@ -254,8 +254,13 @@ export function evaluateTrigger(
   // 冷却：防止刷屏。但"有人直接 @"是明确在叫它，用同一条 20 秒冷却挡住
   // 就是群里两个人同时说话时它彻底哑掉 —— 那看起来像"卡死了"，不像克制。
   const last = state.lastReplyAt.get(env.convKey) ?? 0;
-  const directAt = env.mentions.self || isPrivateConv(env);
-  const cooldownSec = directAt ? Math.min(policy.cooldownSec, 3) : policy.cooldownSec;
+  const directAt = env.mentions.self || isPrivateConv(env) || env.replyTo?.senderIsSelf === true;
+  // 刚说完话的那几分钟里，别人接着说就是在接它的话；12 秒冷却会把正常对话卡成"它不理人"
+  const cooldownSec = directAt
+    ? Math.min(policy.cooldownSec, 2)
+    : inConversation
+      ? Math.min(policy.cooldownSec, 4)
+      : policy.cooldownSec;
   if (now - last < cooldownSec * 1000) {
     return { respond: false, reason: "cooldown" };
   }
@@ -264,7 +269,7 @@ export function evaluateTrigger(
   // 私聊里对方每一句都是在跟它说话，套这个配额就会出现"聊到一半突然不理人"——
   // 用户只会认为它坏了。私聊的花费由日预算兜底。
   // 被直接 @ 就是明确在问它：人均配额只用来防"闲聊刷屏",不该把点名提问挡掉
-  if (!isPrivateConv(env) && !env.mentions.self) {
+  if (!isPrivateConv(env) && !env.mentions.self && env.replyTo?.senderIsSelf !== true) {
     const counterKey = `${env.convKey}:${env.sender.id}`;
     const counter = state.userCounters.get(counterKey);
     if (counter && now - counter.windowStart < HOUR_MS && counter.count >= policy.perUserPerHour) {

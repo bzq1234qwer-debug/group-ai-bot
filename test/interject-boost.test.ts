@@ -60,7 +60,7 @@ test("有人回复它说过的话，一定会接（哪怕内容只是个「嗯�
 
 test("名字加分不会让纯喊名字的家常话失控（有冷却）", () => {
   const state = createTriggerState();
-  state.lastReplyAt.set(CONV, NOW - 5_000); // 5 秒前刚说过
+  state.lastReplyAt.set(CONV, NOW - 2_000); // 2 秒前刚说过（正在聊天，冷却 4 秒）
   const result = evaluateTrigger(make("大肥鱼你在吗"), policy, state, NOW, () => 0);
   assert.equal(result.respond, false);
   assert.equal(result.reason, "cooldown");
