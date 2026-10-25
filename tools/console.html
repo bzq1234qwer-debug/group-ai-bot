@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>群聊 AI · 配置控制台</title>
+<style>
+  :root {
+    --bg:#f5f6f8; --panel:#fff; --line:#e6e8ec; --text:#1a1c1f; --muted:#8a8f98;
+    --accent:#2f6bff; --ok:#1b7f3b; --bad:#b3261e; --warn:#9a6700;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px}
+  h1{font-size:18px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{font-size:14px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:#eef1f5;color:#555}
+  .tag.ok{background:#e7f5ec;color:var(--ok)}
+  .tag.bad{background:#fdeceb;color:var(--bad)}
+  .tag.warn{background:#fff4e0;color:var(--warn)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  input,textarea,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);outline:none;width:100%}
+  input:focus,textarea:focus{border-color:var(--accent)}
+  textarea{min-height:96px;line-height:1.55;resize:vertical}
+  button{font:inherit;border:0;border-radius:8px;padding:9px 16px;background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:#eef1f5;color:var(--text)}
+  button.danger{background:#fdeceb;color:var(--bad)}
+  button:disabled{opacity:.5;cursor:default}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:12px;color:var(--muted)}
+  .chan{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .chan .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .groups{max-height:340px;overflow:auto}
+  .group{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px}
+  .group:hover{background:#f5f7fa}
+  .group small{color:var(--muted)}
+  .msg{font-size:12px;padding:4px 0;border-bottom:1px dashed #eee;color:#333}
+  .msg b{font-weight:600}
+  .hint{font-size:12px;color:var(--muted);line-height:1.6;margin-top:8px}
+  .kbd{font-family:ui-monospace,Consolas,monospace;background:#f2f4f7;padding:1px 6px;border-radius:4px;font-size:12px}
+  .risk p{font-size:13px;line-height:1.75;color:#333;margin:0 0 10px}
+  .risk b{color:#111}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>群聊 AI · 配置控制台</h1>
+  <div class="sub">把一个 QQ 小号变成 AI。左边加号，中间选群，下面填 Key。</div>
+
+  <div class="card" id="wizardCard" style="display:none">
+    <h2>上手向导 <span id="wizTag" class="tag">检查中</span></h2>
+    <div id="wizList"></div>
+    <div class="hint">
+    按顺序做完，它就能在群里说话了。做完这个卡片会自动消失。
+    <br />
+    <b>开始前请把手机拿在手上</b> —— 第 ③ 步要扫码登录 QQ。
+  </div>
+  </div>
+
+  <div class="card" id="cardChannels">
+    <h2>① 接入的号 <span id="chanCount" class="tag">0</span></h2>
+    <div id="chanList"></div>
+  <div class="hint">显示「连接失败」时，先看 QQ 窗口是不是停在登录页 —— 扫码登录后会自动连上。</div>
+
+    <details id="addBox">
+      <summary style="cursor:pointer;color:var(--accent);font-size:13px">＋ 添加一个号</summary>
+      <div class="grid" style="margin-top:12px">
+        <div class="field"><label>备注名</label><input id="fLabel" placeholder="例如：小号A" /></div>
+        <div class="field"><label>QQ 号（可选）</label><input id="fSelfId" placeholder="10001" /></div>
+        <div class="field"><label>WebSocket 地址（SnowLuma / LLOneBot）</label><input id="fWs" placeholder="ws://127.0.0.1:3001" /></div>
+        <div class="field"><label>HTTP 地址（NapCat）</label><input id="fHttp" placeholder="http://127.0.0.1:3000" /></div>
+      </div>
+      <div class="hint">两个地址填一个就行。填 WebSocket 最简单；填 HTTP 的话，下面会给你一个「上报地址」，要填回 NapCat 里。</div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnAdd">连接</button>
+        <span id="addResult" class="hint"></span>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>好友 / 加群申请 <span id="reqTag" class="tag">0</span></h2>
+    <div id="reqList"><div class="hint">有人申请加它、或邀请它进群时，会出现在这里。</div></div>
+    <div class="hint">这些必须你亲自点——AI 不替你交朋友。</div>
+  </div>
+
+  <div class="card" id="cardGroups">
+    <h2>② 让它说话的群 <span id="groupTag" class="tag">先选一个号</span></h2>
+    <div id="groupList" class="groups"><div class="hint">选好号之后，这里会列出它所在的群。</div></div>
+    <div class="hint">勾选 = 这个群交给 AI。没勾的群它完全不理。</div>
+  </div>
+
+  <div class="card">
+    <h2>③ 人设与说话规则</h2>
+    <div class="grid">
+      <div class="field"><label>它叫什么</label><input id="aName" /></div>
+      <div class="field"><label>什么时候说话</label>
+        <select id="aMode">
+          <option value="mention">只回 @ 它的</option>
+          <option value="interject">自己判断要不要插话</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>人设（决定它是谁）</label><textarea id="aPersona"></textarea></div>
+    <div class="grid" style="margin-top:12px">
+      <div class="field"><label>喜欢什么（逗号分隔）</label><input id="aLikes" placeholder="token, 被夸, 摸鱼" /></div>
+      <div class="field"><label>讨厌什么（逗号分隔）</label><input id="aDislikes" placeholder="被叫全名, 刷屏催" /></div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>习惯（逗号分隔，它的默认反应方式）</label>
+      <input id="aHabits" placeholder="先给结论再补一句嘴, 被催先吐槽再回答" />
+      <small>喜好和习惯会在聊天里自然流露，不是每条都提。</small>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div class="field"><label>同群最短间隔（秒）</label><input id="aCooldown" type="number" min="1" /></div>
+      <div class="field"><label>插话话题词（逗号分隔）</label><input id="aKeywords" placeholder="报错,部署,卡住了" /></div>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div class="field">
+        <label>插话积极性 <span id="aRateTag" class="tag">0.40</span></label>
+        <input id="aRate" type="range" min="10" max="60" step="5" style="width:100%" />
+        <div class="hint">越大越爱接话；调到 0.6 容易刷屏，建议先 0.4</div>
+      </div>
+      <div class="field"><label>表情包目录（可选）</label><input id="aEmoji" placeholder="D:\表情包" /></div>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div class="field" style="justify-content:flex-end">
+        <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px">
+          <input id="aMention" type="checkbox" style="width:16px" /> 回复时 @ 提问的人
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px">
+          <input id="aLeave" type="checkbox" style="width:16px" /> 允许 /退群（不可逆）
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px">
+          <input id="aDeep" type="checkbox" style="width:16px" /> 认真模式（被 @ 的技术问题会多想一会儿，慢约 10 秒）        </label>
+        <label style="display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px;margin-top:8px">
+          <input id="aProactive" type="checkbox" style="width:16px" /> 主动开口：群里安静
+          <input id="pQuiet" type="number" min="1" style="width:64px" /> 分钟后自己说一句，间隔
+          <input id="pInterval" type="number" min="1" style="width:64px" /> 分钟
+          <button id="pSave" class="ghost" style="padding:2px 10px">保存</button>
+        </label>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px"><button id="btnAgent">保存人设</button><span id="agentResult" class="hint"></span></div>
+  </div>
+
+  <div class="card" id="cardKey">
+    <h2>④ DeepSeek 密钥 <span id="keyTag" class="tag">未填写</span></h2>
+    <div class="row">
+      <input id="fKey" type="password" placeholder="sk-..." style="flex:1;min-width:240px" />
+      <button id="btnKey">保存</button>
+      <button id="btnTest" class="ghost">测试</button>
+    </div>
+    <div class="hint" id="keyResult">Key 只存在本机的 data/console.json 里，不会上传。</div>
+    <div class="row" style="margin-top:10px">
+      <span class="hint">模型</span>
+      <select id="fModel" style="width:200px">
+        <option value="deepseek-flash">deepseek-flash（便宜快）</option>
+        <option value="deepseek-v4-pro">deepseek-v4-pro（更强贵）</option>
+      </select>
+      <span class="hint">换模型后新对话立即生效</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>花费上限 <span id="quotaTag" class="tag">今日 ¥0.00</span></h2>
+    <div class="grid">
+      <div class="field"><label>每天总共最多花（元）</label><input id="qGlobal" type="number" min="0" step="1" /></div>
+      <div class="field"><label>单个群每天最多花（元）</label><input id="qBinding" type="number" min="0" step="1" /></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="qSave">保存上限</button>
+      <span class="hint" id="qResult"></span>
+    </div>
+    <div class="hint">超了它会自己闭嘴，并在群里回一句"额度用完了"。填 0 = 不限。</div>
+  </div>
+
+  <div class="card">
+    <h2>⑤ 最近说的话 <span id="todayTag" class="tag">今日 ¥0.00</span></h2>
+    <div id="msgBox" class="hint">在一个群里 @ 它试试，这里会显示最近的对话。</div>
+  </div>
+
+  <div class="card">
+    <h2>它记住了什么 <span id="factTag" class="tag">0</span></h2>
+    <div id="factList"><div class="hint">还没有记忆。等它在这个群里聊过一阵，这里会出现它记住的人和规矩。</div></div>
+    <div class="hint">这些是它从聊天里提炼的长期事实。记错了就删，删掉它就不记得了。</div>
+  </div>
+
+  <div class="card">
+    <h2>聊天记录归档 <span id="archTag" class="tag">-</span></h2>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input id="archEnabled" type="checkbox" style="width:16px" /> 每天自动归档
+      </label>
+      <span class="hint">每天</span>
+      <input id="archHour" type="number" min="0" max="23" style="width:70px" />
+      <span class="hint">点执行，保留</span>
+      <input id="archKeep" type="number" min="0" style="width:80px" />
+      <span class="hint">天（0=永久）</span>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <input id="archZip" type="checkbox" style="width:16px" /> 同时打包 zip
+      </label>
+      <button id="archSave" class="ghost">保存</button>
+      <button id="archRun">立即归档昨天</button>
+    </div>
+    <div class="hint" id="archResult" style="margin-top:8px">按会话分文件夹，每天一个目录，存在 data/archive/ 下。</div>
+    <div id="archDays" class="hint"></div>
+  </div>
+
+  <div class="card">
+    <h2>内容安全 <span id="safeTag" class="tag">开启</span></h2>
+    <div class="row" style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input id="safeEnabled" type="checkbox" style="width:16px" /> 启用屏蔽词
+      </label>
+      <span class="hint">入站挡话题，出站挡发言——它说的话是以你的号的名义发出去的</span>
+    </div>
+    <div class="field">
+      <label>屏蔽词（逗号或换行分隔）</label>
+      <textarea id="safeWords" style="min-height:90px" placeholder="毒品, 赌博, 诈骗"></textarea>
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label>被挡下来时回什么</label>
+      <input id="safeReply" placeholder="这个本鱼不接，换点别的话题吧。" />
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="safeSave">保存屏蔽词</button>
+      <span class="hint" id="safeResult"></span>
+    </div>
+    <div class="hint">这是关键词兜底，不是内容审核系统：挡得住明显的雷，挡不住绕着说的。</div>
+  </div>
+
+  <div class="card">
+    <h2>语音 <span id="voiceTag" class="tag">0 个音色</span></h2>
+    <div class="row">
+      <span class="hint">默认音色</span>
+      <select id="vDefault" style="width:220px"></select>
+      <input id="vText" placeholder="试听文字" value="本鱼来啦，今天也要好好吃饭哦。" style="flex:1;min-width:180px" />
+      <button id="vPreview">试听</button>
+    </div>
+    <audio id="vAudio" controls style="width:100%;margin-top:10px;display:none"></audio>
+    <div id="vList" style="margin-top:10px"></div>
+    <div class="grid" style="margin-top:12px">
+      <div class="field"><label>名称</label><input id="vName" placeholder="晓晓 · 温柔女声" /></div>
+      <div class="field"><label>引擎</label>
+        <select id="vEngine">
+          <option value="edge">edge（在线，音色多）</option>
+          <option value="sapi">sapi（Windows 离线）</option>
+          <option value="http">http（自己的语音服务）</option>
+          <option value="custom">custom（自己的命令）</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label>音色 id / 服务地址 / 命令模板</label>
+      <input id="vVoice" placeholder="zh-CN-YunxiNeural，或 http://127.0.0.1:7864/tts，或自定义命令" />
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="vAdd" class="ghost">添加音色</button>
+      <span class="hint" id="vResult">群里发 /语音 你好呀 就会念出来；/语音 云希 你好呀 可以指定音色</span>
+    </div>
+    <div class="hint">自定义引擎：填一条能「文字进、音频出」的命令，用 {text} 和 {out} 占位，例如 GPT-SoVITS / Fish Speech 的调用脚本。</div>
+  </div>
+
+  <div class="card">
+    <h2>诊断</h2>
+    <div class="row">
+      <button id="btnExport" class="ghost">导出诊断包</button>
+      <span class="hint" id="exportResult">出问题把它发我，里面有日志和环境信息（不含 Key）</span>
+    </div>
+  </div>
+</div>
+
+<div id="riskMask" style="display:none;position:fixed;inset:0;background:rgba(15,18,24,.55);z-index:50;align-items:center;justify-content:center">
+  <div style="background:#fff;width:min(640px,92vw);border-radius:14px;padding:24px;max-height:88vh;overflow:auto">
+    <h2 style="margin:0 0 6px;font-size:17px">使用前请阅读</h2>
+    <div class="hint" style="margin-bottom:14px">这不是常规软件，它会在腾讯的平台上替你操作一个真实账号。</div>
+
+    <div class="risk">
+      <p><b>1. 非官方接口。</b>本软件通过第三方注入方案（NapCat）接入 QQ，不是腾讯官方开放能力。这违反腾讯的用户协议。</p>
+      <p><b>2. 账号可能被封。</b>自动化操作真实 QQ 账号有被风控、限制、封禁的风险。风险是真实存在的，不是吓唬你。</p>
+      <p><b>3. 必须用小号。</b>请不要把主号接进来。主号一旦被封，损失不可逆。</p>
+      <p><b>4. 后果自负。</b>账号风险由使用者自行承担，软件作者不承担任何赔偿或连带责任。</p>
+      <p><b>5. 数据在哪。</b>API Key、聊天记录、配置都只存在这台电脑上；但每次对话的内容会发送给 DeepSeek 用于生成回复。</p>
+      <p><b>6. 不要滥用。</b>禁止用于骚扰、群发广告、诈骗或其他违法违规用途。</p>
+    </div>
+
+    <label style="display:flex;gap:10px;align-items:flex-start;margin:18px 0 14px;font-size:13px;line-height:1.6">
+      <input id="riskCheck" type="checkbox" style="width:18px;height:18px;margin-top:2px;flex:none" />
+      <span>我已阅读并理解上述风险，确认<b>使用的是小号</b>，并自行承担由此产生的一切后果。</span>
+    </label>
+
+    <button id="riskAccept" disabled>同意并继续</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let currentChannel = null;
+let lastConvKey = null;
+
+const TOKEN = (new URLSearchParams(location.search).get("token") || localStorage.getItem("groupai.token") || "").trim();
+if (TOKEN) localStorage.setItem("groupai.token", TOKEN);
+
+async function api(path, options) {
+  const headers = Object.assign({}, (options && options.headers) || {});
+  if (TOKEN) headers["x-auth-token"] = TOKEN;
+
+  const res = await fetch(path, Object.assign({}, options, { headers }));
+
+  if (res.status === 401) {
+    const t = prompt("这个控制台需要访问令牌。\n请输入服务器 .env 里的 CONSOLE_TOKEN：");
+    if (t && t.trim()) {
+      localStorage.setItem("groupai.token", t.trim());
+      location.reload();
+    }
+    return { error: "需要访问令牌" };
+  }
+
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { error: text }; }
+}
+
+async function refresh() {
+  const s = await api("/api/state");
+  if (s.error) return;
+
+  // 没确认过风险条款就挡住整个界面
+  if (s.risk) {
+    $("riskMask").style.display = s.risk.accepted ? "none" : "flex";
+  }
+
+  $("chanCount").textContent = s.channels.length;
+  const cny = s.usage?.todayCny ?? 0;
+  $("todayTag").textContent = "今日 ¥" + (cny > 0 && cny < 0.01 ? cny.toFixed(4) : cny.toFixed(2));
+
+  $("chanList").innerHTML = s.channels.length ? "" : '<div class="hint">还没有号。点下面的「添加一个号」。</div>';
+  for (const c of s.channels) {
+    const el = document.createElement("div");
+    el.className = "chan";
+    const statusTag = c.status === "online"
+      ? '<span class="tag ok">在线</span>'
+      : c.status === "connecting"
+        ? '<span class="tag warn">连接中</span>'
+        : '<span class="tag bad">离线</span>';
+
+    el.innerHTML = `
+      <div>
+        <div><b>${c.label}</b> ${statusTag}</div>
+        <div class="meta">${c.id} · ${c.groupCount} 个群 ${c.eventUrl ? " · 上报地址 " + c.eventUrl : ""}</div>
+        ${c.error ? `<div class="meta" style="color:#b3261e">${c.error}</div>` : ""}
+      </div>`;
+
+    const right = document.createElement("div");
+    right.className = "row";
+    const pick = document.createElement("button");
+    pick.className = "ghost";
+    pick.textContent = currentChannel === c.id ? "已选中" : "管理群";
+    pick.onclick = () => selectChannel(c.id);
+    const del = document.createElement("button");
+    del.className = "danger";
+    del.textContent = "移除";
+    del.onclick = async () => {
+      if (!confirm("确定移除 " + c.label + "？")) return;
+      await api("/api/channels/" + encodeURIComponent(c.id), { method: "DELETE" });
+      if (currentChannel === c.id) { currentChannel = null; $("groupList").innerHTML = ""; }
+      refresh();
+    };
+    right.append(pick, del);
+    el.append(right);
+    $("chanList").append(el);
+  }
+
+  if (currentChannel && s.channels.some((c) => c.id === currentChannel)) {
+    loadGroups(currentChannel);
+  }
+
+  // 人设表单只填一次（避免打断输入）
+  if (!refresh.filled && s.agent) {
+    refresh.filled = true;
+    $("aName").value = s.agent.name || "";
+    $("aPersona").value = s.agent.persona || "";
+    const traits = s.agent.traits || {};
+    $("aLikes").value = (traits.likes || []).join(", ");
+    $("aDislikes").value = (traits.dislikes || []).join(", ");
+    $("aHabits").value = (traits.habits || []).join(", ");
+    $("aMode").value = s.agent.mode || "mention";
+    $("aCooldown").value = s.agent.cooldownSec ?? 20;
+    $("aKeywords").value = (s.agent.keywords || []).join(",");
+    $("aRate").value = Math.round((s.agent.interjectRate ?? 0.4) * 100);
+    $("aRateTag").textContent = ((s.agent.interjectRate ?? 0.4)).toFixed(2);
+    $("aEmoji").value = s.agent.emojiDir || "";
+    $("aMention").checked = s.agent.mentionSender !== false;
+    $("aLeave").checked = s.agent.allowLeave === true;
+    $("aDeep").checked = s.agent.deep?.enabled === true;
+    if (s.proactive) {
+      $("aProactive").checked = s.proactive.enabled === true;
+      $("pQuiet").value = s.proactive.quietMin ?? 30;
+      $("pInterval").value = s.proactive.intervalMin ?? 60;
+    }
+  }
+
+  renderRequests(s.requests || []);
+
+  $("keyTag").textContent = s.keySet ? "已填写" : "未填写";
+  $("keyTag").className = "tag " + (s.keySet ? "ok" : "bad");
+
+  if (s.archive) {
+    if (!renderArchive.filled) {
+      renderArchive.filled = true;
+      $("archEnabled").checked = s.archive.enabled !== false;
+      $("archHour").value = s.archive.hour ?? 4;
+      $("archKeep").value = s.archive.keepDays ?? 0;
+      $("archZip").checked = s.archive.zip !== false;
+    }
+    const days = s.archive.days || [];
+    $("archTag").textContent = days.length ? days.length + " 天" : "还没归档";
+    $("archDays").textContent = days.length
+      ? "已归档：" + days.map((d) => `${d.day}（${d.sizeKb}KB）`).join("  ")
+      : "还没有归档记录。";
+  }
+
+  renderFacts(s.facts || [], s.titles || {});
+
+  if (s.safety) {
+    if (!renderSafety.filled) {
+      renderSafety.filled = true;
+      $("safeEnabled").checked = s.safety.enabled !== false;
+      $("safeWords").value = (s.safety.words || []).join("、");
+      $("safeReply").value = s.safety.reply || "";
+    }
+    $("safeTag").textContent = s.safety.enabled !== false ? (s.safety.words || []).length + " 个词" : "已关闭";
+    $("safeTag").className = "tag " + (s.safety.enabled !== false ? "ok" : "");
+  }
+
+  if (s.quota) {
+    if (!renderQuota.filled) {
+      renderQuota.filled = true;
+      $("qGlobal").value = s.quota.globalDailyCny ?? 20;
+      $("qBinding").value = s.quota.bindingDailyCny ?? 5;
+    }
+    const spent = s.quota.spentToday ?? 0;
+    $("quotaTag").textContent = `今日 ¥${spent.toFixed(2)} / ¥${s.quota.globalDailyCny || "不限"}`;
+    $("quotaTag").className = "tag " + (s.quota.globalDailyCny > 0 && spent >= s.quota.globalDailyCny ? "bad" : "");
+  }
+
+  if (s.model && !renderQuota.modelFilled) {
+    renderQuota.modelFilled = true;
+    $("fModel").value = s.model;
+  }
+
+  if (s.voices) {
+    voicesCache = s.voices;
+    if (!renderVoices.filled) {
+      renderVoices.filled = true;
+      renderVoices.defaultId = s.defaultVoiceId;
+    }
+    renderVoices(s.voices, s.defaultVoiceId);
+  }
+
+  const h = await api("/api/health").catch(() => null);
+  if (h && h.steps) renderWizard(h);
+}
+
+const ACTION_LABEL = {
+  "download-qq": "去官网下载",
+  "download-napcat": "去下载",
+  "install-napcat": "自动安装",
+  "start-napcat": "帮我启动",
+  "add-channel": "去添加",
+  "restart-channel": "去看看",
+  "focus-key": "去填写",
+  "focus-groups": "去选群",
+};
+
+function renderWizard(h) {
+  const card = $("wizardCard");
+  if (h.allOk) {
+    card.style.display = "none";
+    return;
+  }
+  card.style.display = "";
+  const done = h.steps.filter((s) => s.ok).length;
+  $("wizTag").textContent = done + " / " + h.steps.length;
+  $("wizTag").className = "tag warn";
+
+  const box = $("wizList");
+  box.innerHTML = "";
+  for (const s of h.steps) {
+    const row = document.createElement("div");
+    row.className = "group";
+
+    const left = document.createElement("div");
+    left.innerHTML = `<div>${s.ok ? "✅" : "⬜"} <b>${escapeHtml(s.title)}</b></div><small>${escapeHtml(s.detail)}</small>`;
+    row.append(left);
+
+    if (!s.ok && s.action) {
+      const btn = document.createElement("button");
+      btn.textContent = ACTION_LABEL[s.action] || "去处理";
+      btn.onclick = () => doAction(s.action);
+      row.append(btn);
+    }
+    box.append(row);
+  }
+}
+
+async function doAction(action) {
+  if (action === "download-qq") {
+    window.open("https://im.qq.com/", "_blank");
+    return;
+  }
+  if (action === "download-napcat") {
+    window.open("https://github.com/NapNeko/NapCatQQ/releases/latest", "_blank");
+    return;
+  }
+  if (action === "install-napcat") {
+    const r = await api("/api/napcat/install", { method: "POST" });
+    alert(
+      r.error
+        ? "自动安装失败：" + r.error + "\n可以去官网手动下载"
+        : "正在后台下载（约 34MB）。国内可能很慢，几分钟后点刷新。\n如果一直不动，去 github.com/NapNeko/NapCatQQ/releases 手动下载解压到 C:\\napcat",
+    );
+    setTimeout(refresh, 4000);
+    return;
+  }
+  if (action === "start-napcat") {
+    const r = await api("/api/napcat/start", { method: "POST" });
+    alert(r.error ? "启动失败：" + r.error : "已发出启动指令。NapCat 窗口会弹出来，需要的话扫码登录。");
+    setTimeout(refresh, 3000);
+    return;
+  }
+  if (action === "focus-key") {
+    scrollTo("cardKey");
+    $("fKey").focus();
+    return;
+  }
+  if (action === "focus-groups") {
+    scrollTo("cardGroups");
+    return;
+  }
+  scrollTo("cardChannels");
+}
+
+function scrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderRequests(reqs) {
+  $("reqTag").textContent = reqs.length;
+  $("reqTag").className = "tag " + (reqs.length ? "warn" : "");
+
+  const box = $("reqList");
+  box.innerHTML = reqs.length ? "" : '<div class="hint">暂时没有待处理的申请。</div>';
+
+  for (const r of reqs) {
+    const kind = r.kind === "friend"
+      ? "加好友"
+      : (r.subType === "invite" ? "邀请进群" : "申请入群");
+
+    const row = document.createElement("div");
+    row.className = "chan";
+    const info = document.createElement("div");
+    info.innerHTML = `<div><b>${escapeHtml(r.nickname || r.userId)}</b> <span class="tag">${kind}</span></div>
+      <div class="meta">${r.groupId ? "群 " + escapeHtml(r.groupId) + " · " : ""}${r.comment ? "备注：" + escapeHtml(r.comment) : "无备注"}</div>`;
+
+    const right = document.createElement("div");
+    right.className = "row";
+    const yes = document.createElement("button");
+    yes.textContent = "同意";
+    yes.onclick = () => respondRequest(r.id, true);
+    const no = document.createElement("button");
+    no.className = "danger";
+    no.textContent = "拒绝";
+    no.onclick = () => respondRequest(r.id, false);
+    right.append(yes, no);
+
+    row.append(info, right);
+    box.append(row);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function renderFacts(facts, titles) {
+  $("factTag").textContent = facts.length;
+  $("factTag").className = "tag " + (facts.length ? "ok" : "");
+
+  const box = $("factList");
+  box.innerHTML = facts.length
+    ? ""
+    : '<div class="hint">还没有记忆。等它在这个群里聊过一阵，这里会出现它记住的人和规矩。</div>';
+  if (!facts.length) return;
+
+  const groups = new Map();
+  for (const f of facts) {
+    if (!groups.has(f.convKey)) groups.set(f.convKey, []);
+    groups.get(f.convKey).push(f);
+  }
+
+  for (const [convKey, list] of groups) {
+    const title = document.createElement("div");
+    title.className = "meta";
+    title.style.marginTop = "10px";
+    title.textContent = titles[convKey] || convKey;
+    box.append(title);
+
+    for (const f of list) {
+      const row = document.createElement("div");
+      row.className = "group";
+
+      const left = document.createElement("div");
+      left.innerHTML = `<div><b>${escapeHtml(f.subject)}</b> <span class="tag">${escapeHtml(f.attribute)}</span></div>
+        <small>${escapeHtml(f.value)}</small>`;
+
+      const btn = document.createElement("button");
+      btn.className = "danger";
+      btn.textContent = "删掉";
+      btn.onclick = async () => {
+        const r = await api("/api/facts/delete", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: f.id }),
+        });
+        if (r.error) alert(r.error);
+        refresh();
+      };
+
+      row.append(left, btn);
+      box.append(row);
+    }
+  }
+}
+
+async function respondRequest(id, approve) {  const r = await api("/api/requests/respond", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, approve }),
+  });
+  if (r.error) alert(r.error);
+  refresh();
+}
+
+async function selectChannel(id) {
+  currentChannel = id;
+  await loadGroups(id);
+  refresh();
+}
+
+async function loadGroups(channelId) {
+  const groups = await api("/api/groups?channel=" + encodeURIComponent(channelId));
+  if (groups.error) {
+    $("groupTag").textContent = groups.error;
+    $("groupList").innerHTML = "";
+    return;
+  }
+  $("groupTag").textContent = groups.length + " 个群";
+  $("groupList").innerHTML = groups.length ? "" : '<div class="hint">这个号没群，或者适配器不支持列群。也可以直接在群里 @ 它，会自动出现在这里。</div>';
+
+  for (const g of groups) {
+    const row = document.createElement("div");
+    row.className = "group";
+    const label = document.createElement("div");
+    label.innerHTML = `<div>${escapeHtml(g.title)}</div><small>${escapeHtml(g.convKey)}${g.memberCount ? " · " + g.memberCount + "人" : ""}</small>`;
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = g.bound;
+    box.style.width = "18px";
+    box.onchange = async () => {
+      await api("/api/bindings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ convKey: g.convKey, enabled: box.checked }),
+      });
+      lastConvKey = g.convKey;
+      loadMessages(g.convKey);
+    };
+    row.append(label, box);
+    row.onclick = (e) => { if (e.target !== box) loadMessages(g.convKey); };
+    $("groupList").append(row);
+  }
+}
+
+async function loadMessages(convKey) {
+  const rows = await api("/api/messages?convKey=" + encodeURIComponent(convKey));
+  if (!Array.isArray(rows) || rows.length === 0) {
+    $("msgBox").innerHTML = "这个群还没有记录。";
+    return;
+  }
+  $("msgBox").innerHTML = rows
+    .map((r) => `<div class="msg"><b>${r.self ? "AI" : escapeHtml(r.sender)}</b>：${escapeHtml(r.text)}</div>`)
+    .join("");
+}
+
+$("btnAdd").onclick = async () => {
+  $("btnAdd").disabled = true;
+  $("addResult").textContent = "连接中…";
+  const r = await api("/api/channels", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      label: $("fLabel").value,
+      selfId: $("fSelfId").value,
+      wsUrl: $("fWs").value,
+      baseUrl: $("fHttp").value,
+    }),
+  });
+  $("btnAdd").disabled = false;
+  if (r.error) {
+    $("addResult").textContent = "失败：" + r.error;
+    return;
+  }
+  $("addResult").textContent = r.status === "online"
+    ? "已连接" + (r.eventUrl ? "，请把上报地址填到 NapCat：" + r.eventUrl : "")
+    : "保存了，但连接失败：" + (r.error || "未知原因");
+  currentChannel = r.id;
+  refresh();
+};
+
+$("pSave").onclick = async () => {
+  const r = await api("/api/proactive", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      enabled: $("aProactive").checked,
+      quietMin: Number($("pQuiet").value),
+      intervalMin: Number($("pInterval").value),
+    }),
+  });
+  $("agentResult").textContent = r.error ? "保存失败：" + r.error : "主动开口已保存";
+  setTimeout(() => ($("agentResult").textContent = ""), 2500);
+};
+
+$("btnAgent").onclick = async () => {
+  await api("/api/agent", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: $("aName").value,
+      persona: $("aPersona").value,
+      traits: {
+        likes: $("aLikes").value,
+        dislikes: $("aDislikes").value,
+        habits: $("aHabits").value,
+      },
+      mode: $("aMode").value,
+      cooldownSec: Number($("aCooldown").value) || 20,
+      keywords: $("aKeywords").value.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
+      interjectRate: Number($("aRate").value) / 100,
+      mentionSender: $("aMention").checked,
+      allowLeave: $("aLeave").checked,
+      deep: { enabled: $("aDeep").checked, maxTokens: 2400 },
+      emojiDir: $("aEmoji").value.trim(),
+    }),
+  });
+  $("agentResult").textContent = "已保存，新配置已生效";
+  setTimeout(() => ($("agentResult").textContent = ""), 2500);
+};
+
+$("btnKey").onclick = async () => {
+  await api("/api/key", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ key: $("fKey").value }),
+  });
+  $("keyResult").textContent = "已保存到本机";
+  refresh();
+};
+
+$("btnTest").onclick = async () => {
+  $("btnTest").disabled = true;
+  $("keyResult").textContent = "测试中…";
+  const r = await api("/api/key/test", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ key: $("fKey").value }),
+  });
+  $("btnTest").disabled = false;
+  $("keyResult").textContent = r.ok ? "✓ 通了，模型回复：" + r.reply : "✗ " + (r.error || "失败");
+};
+
+$("btnExport").onclick = async () => {
+  $("btnExport").disabled = true;
+  $("exportResult").textContent = "导出中…";
+  const r = await api("/api/logs/export", { method: "POST" });
+  $("btnExport").disabled = false;
+  $("exportResult").textContent = r.error ? "失败：" + r.error : "已导出：" + r.path;
+};
+
+$("riskCheck").onchange = (e) => { $("riskAccept").disabled = !e.target.checked; };
+$("riskAccept").onclick = async () => {
+  const r = await api("/api/risk/accept", { method: "POST" });
+  if (r.ok) {
+    $("riskMask").style.display = "none";
+    refresh();
+  }
+};
+
+$("archSave").onclick = async () => {
+  const r = await api("/api/archive/config", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      enabled: $("archEnabled").checked,
+      hour: Number($("archHour").value),
+      keepDays: Number($("archKeep").value),
+      zip: $("archZip").checked,
+    }),
+  });
+  $("archResult").textContent = r.error ? "失败：" + r.error : "已保存归档设置";
+  refresh();
+};
+
+$("archRun").onclick = async () => {
+  $("archRun").disabled = true;
+  $("archResult").textContent = "归档中…";
+  const r = await api("/api/archive/run", { method: "POST" });
+  $("archRun").disabled = false;
+  $("archResult").textContent = r.error
+    ? "失败：" + r.error
+    : `已归档 ${r.day}：${r.conversations} 个会话、${r.messages} 条消息 → ${r.dir}`;
+  refresh();
+};
+
+$("safeSave").onclick = async () => {
+  const r = await api("/api/safety", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      enabled: $("safeEnabled").checked,
+      words: $("safeWords").value,
+      reply: $("safeReply").value,
+    }),
+  });
+  $("safeResult").textContent = r.error ? "失败：" + r.error : "已保存，立即生效";
+  refresh();
+};
+
+$("qSave").onclick = async () => {
+  const r = await api("/api/quota", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      globalDailyCny: Number($("qGlobal").value),
+      bindingDailyCny: Number($("qBinding").value),
+    }),
+  });
+  $("qResult").textContent = r.error ? "失败：" + r.error : "已保存，立即生效";
+  refresh();
+};
+
+$("fModel").onchange = async () => {
+  const r = await api("/api/key", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ key: $("fKey").value, model: $("fModel").value }),
+  });
+  $("keyResult").textContent = r.error ? "切换失败：" + r.error : "模型已切换为 " + $("fModel").value;
+};
+
+let voicesCache = [];
+
+function renderVoices(voices, defaultId) {
+  $("voiceTag").textContent = voices.length + " 个音色";
+
+  // 默认音色下拉框（保留用户当前选择，别每次刷新都弹回去）
+  const sel = $("vDefault");
+  const current = sel.value || defaultId;
+  sel.innerHTML = voices
+    .map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`)
+    .join("");
+  if (voices.some((v) => v.id === current)) sel.value = current;
+
+  // 列表
+  const box = $("vList");
+  box.innerHTML = voices.length ? "" : '<div class="hint">还没有音色，下面加一个。</div>';
+  for (const v of voices) {
+    const row = document.createElement("div");
+    row.className = "group";
+    const left = document.createElement("div");
+    const detail = v.engine === "custom" ? "自定义命令" : (v.voice || "");
+    left.innerHTML = `<div><b>${escapeHtml(v.name)}</b> <span class="tag">${escapeHtml(v.engine)}</span></div>
+      <small>${escapeHtml(detail)}</small>`;
+    const btn = document.createElement("button");
+    btn.className = "danger";
+    btn.textContent = "删掉";
+    btn.onclick = async () => {
+      const next = voicesCache.filter((x) => x.id !== v.id);
+      await saveVoices(next, sel.value);
+      refresh();
+    };
+    row.append(left, btn);
+    box.append(row);
+  }
+}
+
+async function saveVoices(voices, defaultId) {
+  const r = await api("/api/voices", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ voices, defaultVoiceId: defaultId }),
+  });
+  if (r.error) $("vResult").textContent = "失败：" + r.error;
+  return r;
+}
+
+$("vDefault").onchange = async () => {
+  await saveVoices(voicesCache, $("vDefault").value);
+  $("vResult").textContent = "默认音色已切换";
+};
+
+$("vPreview").onclick = async () => {
+  $("vPreview").disabled = true;
+  $("vResult").textContent = "合成中…";
+  const r = await api("/api/voice/preview", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text: $("vText").value, presetId: $("vDefault").value }),
+  });
+  $("vPreview").disabled = false;
+  if (r.error) {
+    $("vResult").textContent = "失败：" + r.error;
+    return;
+  }
+  const audio = $("vAudio");
+  audio.style.display = "";
+  audio.src = r.url;
+  audio.play().catch(() => {});
+  $("vResult").textContent = `合成成功（${r.engine}）`;
+};
+
+$("vAdd").onclick = async () => {
+  const name = $("vName").value.trim();
+  const engine = $("vEngine").value;
+  const voice = $("vVoice").value.trim();
+  if (!name) {
+    $("vResult").textContent = "先给它起个名字";
+    return;
+  }
+  if (engine !== "custom" && !voice) {
+    $("vResult").textContent = engine === "edge" ? "edge 需要填音色 id，例如 zh-CN-YunxiNeural" : "sapi 需要填系统语音名";
+    return;
+  }
+
+  if (engine !== "custom" && !voice) {
+    $("vResult").textContent =
+      engine === "edge" ? "edge 需要填音色 id，例如 zh-CN-YunxiNeural"
+      : engine === "http" ? "http 需要填服务地址，例如 http://127.0.0.1:7864/tts"
+      : "sapi 需要填系统语音名";
+    return;
+  }
+
+  const id = `v${Date.now().toString(36)}`;
+  const preset = { id, name, engine };
+  if (engine === "edge" || engine === "sapi") preset.voice = voice;
+  if (engine === "custom") preset.command = voice;
+  if (engine === "http") {
+    preset.url = voice;
+    preset.emotion = "tender";
+  }
+
+  await saveVoices([...voicesCache, preset], $("vDefault").value || id);
+  $("vName").value = "";
+  $("vVoice").value = "";
+  $("vResult").textContent = "已添加";
+  refresh();
+};
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "group-ai-bot",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "把 DeepSeek 变成群成员：QQ 群 / 微信群的 AI 助手运行时",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "demo": "node tools/demo.ts",
+    "preview": "node tools/preview.ts",
+    "console": "node tools/console.ts",
+    "fake-qq": "node tools/fake-qq.ts",
+    "mock": "node tools/mock-onebot.ts",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/ws": "^8.18.2",
+    "typescript": "^5.9.3",
+    "ws": "^8.22.0"
+  }
+}

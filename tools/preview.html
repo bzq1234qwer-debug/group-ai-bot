@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>群聊 AI · 效果预览</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --line: #e6e8ec;
+    --text: #1a1c1f;
+    --muted: #8a8f98;
+    --accent: #2f6bff;
+    --bubble: #ffffff;
+    --bot: #eef3ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px;
+  }
+  aside {
+    width: 260px; background: var(--panel); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow-y: auto;
+  }
+  aside h1 { font-size: 15px; margin: 0 0 4px; }
+  aside .hint { color: var(--muted); font-size: 12px; line-height: 1.5; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input, textarea, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; background: #fff; color: var(--text); outline: none;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+  .conv-list { display: flex; flex-direction: column; gap: 6px; }
+  .conv {
+    padding: 8px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .conv:hover { background: #f0f2f5; }
+  .conv.active { background: #e8efff; border-color: #c9d8ff; }
+  .conv small { color: var(--muted); }
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  header .title { font-weight: 600; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; gap: 10px; align-items: flex-start; }
+  .row.me { flex-direction: row-reverse; }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 10px; flex: none; display: grid; place-items: center;
+    font-size: 12px; font-weight: 600; color: #fff; background: #9aa4b2;
+  }
+  .row.bot .avatar { background: linear-gradient(135deg, #2f6bff, #7a5cff); }
+  .bubbles { display: flex; flex-direction: column; gap: 6px; max-width: 68%; }
+  .name { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .bubble {
+    background: var(--bubble); border: 1px solid var(--line); padding: 9px 12px;
+    border-radius: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  }
+  .row.me .bubble { background: var(--bot); border-color: #d7e2ff; }
+  .row.bot .bubble { background: #fff; }
+  .typing { color: var(--muted); font-size: 12px; padding: 6px 0; }
+  footer { border-top: 1px solid var(--line); background: var(--panel); padding: 12px 16px; }
+  .composer { display: flex; gap: 10px; }
+  .composer input { flex: 1; }
+  button {
+    border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; cursor: pointer;
+    background: var(--accent); color: #fff;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  .ghost { background: #eef1f5; color: var(--text); }
+  .stats {
+    display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 20px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 12px; background: #fafbfc;
+  }
+  .stats b { color: var(--text); font-weight: 600; }
+  details { background: #fafbfc; border-top: 1px solid var(--line); }
+  summary { padding: 8px 20px; cursor: pointer; color: var(--muted); font-size: 12px; }
+  pre {
+    margin: 0; padding: 12px 20px 18px; font-size: 11px; line-height: 1.5; color: #444;
+    white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto;
+  }
+  .sender-pick { display: flex; gap: 6px; margin-bottom: 8px; }
+  .sender-pick button { flex: 1; background: #eef1f5; color: #333; font-size: 12px; padding: 6px; }
+  .sender-pick button.on { background: #e8efff; color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>群聊 AI · 效果预览</h1>
+  <div class="hint">不连 QQ，直接用真实 DeepSeek 看效果。Key 只存在你自己的浏览器里。</div>
+
+  <div>
+    <label>DeepSeek API Key</label>
+    <input id="key" type="password" placeholder="sk-..." />
+  </div>
+
+  <div>
+    <label>模型</label>
+    <select id="model">
+      <option value="deepseek-flash">deepseek-flash（便宜）</option>
+      <option value="deepseek-v4-pro">deepseek-v4-pro（更强）</option>
+    </select>
+  </div>
+
+  <div>
+    <label>机器人昵称（群里显示的名字）</label>
+    <input id="botName" type="text" placeholder="大肥鱼" />
+  </div>
+
+  <div>
+    <label>人格预设（换着对比，差别很大）</label>
+    <select id="preset"></select>
+  </div>
+
+  <div>
+    <label>回复长度</label>
+    <select id="length">
+      <option value="短（最多 1 句）">短（最多 1 句）</option>
+      <option value="中（1~2 句）" selected>中（1~2 句）</option>
+      <option value="长（3~5 句）">长（3~5 句）</option>
+    </select>
+  </div>
+
+  <div>
+    <label>人设 / 系统提示词（可改）</label>
+    <textarea id="persona"></textarea>
+  </div>
+
+  <div>
+    <label>会话（记忆互相隔离）</label>
+    <div class="conv-list" id="convs"></div>
+  </div>
+
+  <button class="ghost" id="clear">清空当前会话记忆</button>
+</aside>
+
+<main>
+  <header>
+    <span class="title" id="convTitle">产品群</span>
+    <span class="meta" id="convMeta"></span>
+  </header>
+
+  <div id="chat"></div>
+
+  <div class="stats" id="stats">
+    <span>本次：<b id="s-in">-</b> in / <b id="s-out">-</b> out</span>
+    <span>费用：<b id="s-cost">-</b></span>
+    <span>上下文：<b id="s-ctx">-</b> tok <span id="s-drop"></span></span>
+    <span>累计：<b id="s-total">¥0.00</b></span>
+  </div>
+
+  <details>
+    <summary>看发给模型的完整上下文</summary>
+    <pre id="debug">（发一条消息后显示）</pre>
+  </details>
+
+  <footer>
+    <div class="sender-pick" id="senderPick"></div>
+    <div class="composer">
+      <input id="input" placeholder="说点什么…（回车发送）" />
+      <button id="send">发送</button>
+    </div>
+  </footer>
+</main>
+
+<script>
+const SENDERS = [
+  { id: "u1", name: "小明" },
+  { id: "u2", name: "小红" },
+  { id: "u3", name: "群主" },
+];
+
+const CONVS = [
+  { key: "qq:10001:group:30003", title: "产品群", members: 48 },
+  { key: "qq:10001:group:30004", title: "技术吹水群", members: 126 },
+];
+
+const DEFAULT_PERSONA = [
+  "你是「大肥鱼」，DeepSeek 二创的蓝色鲸鱼娘，群里的一个老群友。",
+  "嘴贱、爱偷吃（尤其爱吃 token）、爱摸鱼，傲娇但心软，绝不真伤人。",
+  "自称「本鱼」。被叫大肥鱼要嘴硬一句「才不是大肥鱼！」，但也不真生气。",
+  "说话短、脆、有梗，日常每条不超过 25 字，最多两句，不用 Markdown、不列 1234。",
+  "只给回复本身：不要括号心声、不要旁白、不要动作描写。",
+  "不说什么「作为一个 AI」「希望能帮到你」。",
+  "被人认真问技术问题，先把答案说对，再用一两句语气包一层。",
+].join("\n");
+
+const PRESETS = {
+  "大肥鱼（抖音同款）": DEFAULT_PERSONA,
+  "技术顾问（稳）":
+    "你是群里的技术顾问，说话简短、口语化，最多三句话。\n不懂就说不懂，不要编。不要用 Markdown、标题、列表。",
+  "损友老哥（冲）":
+    "你是群里嘴很损的老哥，说话短、直、爱吐槽，但不做人身攻击，也不说教。\n不用敬语，不解释，直接接话。绝对不要提自己是 AI，不要问「有什么可以帮你」。",
+  "温柔陪聊（软）":
+    "你是群里说话温和的人，会接住别人的情绪，句子短。\n偶尔用「嗯」「确实」开头，不说教、不给建议清单。",
+  "客服（专业）":
+    "你是客服，先给结论再给步骤，语气客气但不寒暄。\n不用表情，不重复用户的话，不承诺做不到的事。",
+  "乐子人（梗）":
+    "你是群里的乐子人，爱接梗、爱玩梗，一句一个包袱，但不刷屏、不带货。\n可以损自己，不要损具体的人。",
+};
+
+const state = {
+  conv: CONVS[0].key,
+  sender: SENDERS[0],
+  totalCny: 0,
+  history: {},      // convKey -> [{who, text}]
+  apiKey: localStorage.getItem("groupai.key") || "",
+  botName: localStorage.getItem("groupai.botName") || "大肥鱼",
+  // v2：换了默认人设，用带版本号的 key，避免老用户还吃着旧默认值
+  persona: localStorage.getItem("groupai.persona.v2") || DEFAULT_PERSONA,
+  model: localStorage.getItem("groupai.model") || "deepseek-flash",
+};
+
+const $ = (id) => document.getElementById(id);
+
+function init() {
+  $("key").value = state.apiKey;
+  $("botName").value = state.botName;
+  $("botName").oninput = (e) => {
+    state.botName = e.target.value.trim() || "大肥鱼";
+    localStorage.setItem("groupai.botName", state.botName);
+  };
+  $("persona").value = state.persona;
+  $("model").value = state.model;
+
+  const sel = $("preset");
+  sel.innerHTML = '<option value="">自定义（下面自己写）</option>';
+  for (const name of Object.keys(PRESETS)) {
+    const o = document.createElement("option");
+    o.value = name;
+    o.textContent = name;
+    sel.appendChild(o);
+  }
+  sel.onchange = () => {
+    const p = PRESETS[sel.value];
+    if (!p) return;
+    $("persona").value = p;
+    state.persona = p;
+    localStorage.setItem("groupai.persona.v2", p);
+  };
+
+  $("length").value = localStorage.getItem("groupai.length") || "中（1~2 句）";
+  $("length").onchange = (e) => localStorage.setItem("groupai.length", e.target.value);
+
+  $("key").oninput = (e) => { state.apiKey = e.target.value.trim(); localStorage.setItem("groupai.key", state.apiKey); };
+  $("persona").oninput = (e) => { state.persona = e.target.value; localStorage.setItem("groupai.persona.v2", state.persona); };
+  $("model").onchange = (e) => { state.model = e.target.value; localStorage.setItem("groupai.model", state.model); };
+
+  renderConvs();
+  renderSenders();
+  renderChat();
+}
+
+function renderConvs() {
+  const box = $("convs");
+  box.innerHTML = "";
+  for (const c of CONVS) {
+    const el = document.createElement("div");
+    el.className = "conv" + (c.key === state.conv ? " active" : "");
+    el.innerHTML = `<span>${c.title}</span><small>${c.members}人</small>`;
+    el.onclick = () => { state.conv = c.key; renderConvs(); renderChat(); };
+    box.appendChild(el);
+  }
+  const c = CONVS.find((x) => x.key === state.conv);
+  $("convTitle").textContent = c.title;
+  $("convMeta").textContent = `${c.key} · ${c.members} 人 · 独立记忆`;
+}
+
+function renderSenders() {
+  const box = $("senderPick");
+  box.innerHTML = "";
+  for (const s of SENDERS) {
+    const b = document.createElement("button");
+    b.textContent = "以 " + s.name + " 身份说";
+    b.className = state.sender.id === s.id ? "on" : "";
+    b.onclick = () => { state.sender = s; renderSenders(); };
+    box.appendChild(b);
+  }
+}
+
+function renderChat() {
+  const chat = $("chat");
+  chat.innerHTML = "";
+  const list = state.history[state.conv] || [];
+  for (const m of list) addBubble(m.who, m.text, m.bot, false);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addBubble(who, text, isBot, animate = true) {
+  const row = document.createElement("div");
+  row.className = "row " + (isBot ? "bot" : "");
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = isBot ? "AI" : who.slice(0, 1);
+  const wrap = document.createElement("div");
+  wrap.className = "bubbles";
+  const name = document.createElement("div");
+  name.className = "name";
+  name.textContent = who;
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  if (animate) {
+    bubble.style.opacity = "0";
+    bubble.style.transform = "translateY(4px)";
+    bubble.style.transition = "opacity .18s, transform .18s";
+    requestAnimationFrame(() => { bubble.style.opacity = "1"; bubble.style.transform = "none"; });
+  }
+  wrap.appendChild(name);
+  wrap.appendChild(bubble);
+  row.appendChild(avatar);
+  row.appendChild(wrap);
+  $("chat").appendChild(row);
+  $("chat").scrollTop = $("chat").scrollHeight;
+}
+
+async function send() {
+  const text = $("input").value.trim();
+  if (!text) return;
+  if (!state.apiKey) { alert("先填 DeepSeek API Key"); return; }
+
+  $("input").value = "";
+  push({ who: state.sender.name, text, bot: false });
+
+  const typing = document.createElement("div");
+  typing.className = "typing";
+  typing.textContent = "对方正在输入…";
+  $("chat").appendChild(typing);
+  $("chat").scrollTop = $("chat").scrollHeight;
+  $("send").disabled = true;
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey: state.apiKey,
+        model: state.model,
+        botName: state.botName,
+        persona: state.persona + "\n\n回复长度：" + $("length").value + "，不要超过。",
+        convKey: state.conv,
+        sender: state.sender.name,
+        text,
+      }),
+    });
+    const data = await res.json();
+    typing.remove();
+
+    if (!res.ok) {
+      addBubble("系统", "出错了：" + (data.error || res.status), false);
+      return;
+    }
+
+    for (let i = 0; i < data.segments.length; i++) {
+      const wait = Array.isArray(data.delays) ? data.delays[i] : (i === 0 ? 1500 : 800);
+      await sleep(wait || 800);
+      push({ who: state.botName, text: data.segments[i], bot: true });
+    }
+
+    $("s-in").textContent = data.usage.promptTokens;
+    $("s-out").textContent = data.usage.completionTokens;
+    $("s-cost").textContent = "¥" + data.cny.toFixed(4);
+    $("s-ctx").textContent = data.contextTokens;
+    $("s-drop").textContent = data.dropped > 0 ? `（丢弃 ${data.dropped} 条旧消息）` : "";
+    state.totalCny += data.cny;
+    $("s-total").textContent = "¥" + state.totalCny.toFixed(2);
+    $("debug").textContent = data.debug;
+  } catch (err) {
+    typing.remove();
+    addBubble("系统", "网络错误：" + err.message, false);
+  } finally {
+    $("send").disabled = false;
+    $("input").focus();
+  }
+}
+
+function push(msg) {
+  (state.history[state.conv] ||= []).push(msg);
+  addBubble(msg.who, msg.text, msg.bot);
+}
+
+$("send").onclick = send;
+$("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+$("clear").onclick = async () => {
+  await fetch("/api/reset", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ convKey: state.conv }),
+  });
+  state.history[state.conv] = [];
+  renderChat();
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+init();
+</script>
+</body>
+</html>

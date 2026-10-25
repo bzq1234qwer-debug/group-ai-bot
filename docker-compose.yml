@@ -1,0 +1,53 @@
+# 服务器部署：NapCat（自带 QQ）+ 我们的运行时
+#
+# 用之前先把 .env.example 复制成 .env，把 CONSOLE_TOKEN 改成一串随机字符。
+
+services:
+  napcat:
+    # 【必须锁版本，不要用 latest】
+    # NapCat 上游有已知问题：最新版的登录会被风控检测导致频繁掉线
+    # https://github.com/NapNeko/NapCatQQ/issues/1728
+    # 社区反馈是"锁某个版本能长期稳定，追新反而一两天掉一次"。
+    # 升级前先在测试号上跑两天，别直接换线上的。
+    image: mlikiowa/napcat-docker:v4.18.41
+    container_name: groupai-napcat
+    restart: unless-stopped
+    # 内存上限：超过就只杀这个容器（然后自动重启），不会把整台机器拖进 OOM
+    # 2G 机器上 1.2G 是比较稳的上限；如果日志里频繁看到容器重启，说明 QQ 在涨
+    mem_limit: 1200m
+    environment:
+      - NAPCAT_UID=1000
+      - NAPCAT_GID=1000
+    ports:
+      # WebUI 只绑本机，用 SSH 隧道访问最安全：ssh -L 6099:127.0.0.1:6099 用户@服务器
+      - "127.0.0.1:6099:6099"
+    volumes:
+      - ./napcat/config:/app/napcat/config
+      - ./napcat/qq:/app/.config/QQ
+    networks:
+      - groupai
+
+  app:
+    build: .
+    container_name: groupai-app
+    restart: unless-stopped
+    # 我们的运行时很轻：实测 70MB 左右，给 256M 绰绰有余
+    mem_limit: 256m
+    depends_on:
+      - napcat
+    environment:
+      # 必须设令牌，否则任何人都能打开你的控制台。
+      # 这里用 :? 语法：.env 里没写这一项就直接报错退出，不会静默裸奔。
+      - CONSOLE_TOKEN=${CONSOLE_TOKEN:?请先在 .env 里设置 CONSOLE_TOKEN}
+      - CONSOLE_HOST=0.0.0.0
+      # 容器之间用服务名互相访问
+      - NAPCAT_WS_URL=ws://napcat:3001
+    ports:
+      - "${CONSOLE_PORT:-7799}:7799"
+    volumes:
+      - ./data:/app/data
+    networks:
+      - groupai
+
+networks:
+  groupai:

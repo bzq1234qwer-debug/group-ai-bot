@@ -1,0 +1,19 @@
+node_modules/
+data/
+*.db
+*.db-shm
+*.db-wal
+.probe/
+dist/
+*.log
+config.json
+.env
+android/build/
+android/debug.keystore
+android/*.apk
+
+# 未完成的 Android 版本，不进公开仓库
+android/
+build.ps1
+# 打包产物
+群聊AI-*.zip

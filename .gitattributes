@@ -1,0 +1,22 @@
+# 统一换行符，避免 Windows / Linux 提交时整文件 diff
+* text=auto
+
+# Windows 脚本必须 CRLF，否则 cmd 解析会出问题
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 其余统一 LF
+*.ts text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.sh text eol=lf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.wav binary
+*.mp3 binary

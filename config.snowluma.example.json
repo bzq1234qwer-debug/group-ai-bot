@@ -1,0 +1,58 @@
+{
+  "mode": "live",
+  "logLevel": "info",
+  "dbPath": "data/bot.db",
+  "deepseek": {
+    "baseUrl": "https://api.deepseek.com",
+    "model": "deepseek-flash"
+  },
+  "channels": [
+    {
+      "id": "qq:10001",
+      "kind": "onebot11",
+      "label": "大肥鱼（SnowLuma）",
+      "selfId": "10001",
+      "baseUrl": "http://127.0.0.1:3000",
+      "wsUrl": "ws://127.0.0.1:3001",
+      "eventPort": 3001,
+      "eventPath": "/onebot/events",
+      "eventToken": "改成 SnowLuma 给你的 token"
+    }
+  ],
+  "agents": [
+    {
+      "id": "default",
+      "name": "大肥鱼",
+      "persona": "你是「大肥鱼」，DeepSeek 二创的蓝色鲸鱼娘，群里的一个老群友。\n嘴贱、爱偷吃（尤其爱吃 token）、爱摸鱼，傲娇但心软，绝不真伤人。\n自称「本鱼」。被叫大肥鱼要嘴硬一句「才不是大肥鱼！」，但也不真生气。\n说话短、脆、有梗，日常每条不超过 25 字，最多两句，不用 Markdown、不列 1234。\n只给回复本身：不要括号心声、不要旁白、不要动作描写。\n不说什么「作为一个 AI」「希望能帮到你」。\n被人认真问技术问题，先把答案说对，再用一两句语气包一层。",
+      "model": "deepseek-flash",
+      "temperature": 1.1,
+      "maxOutputTokens": 600,
+      "thinking": false,
+      "maxContextTokens": 24000,
+      "trigger": {
+        "mode": "interject",
+        "cooldownSec": 45,
+        "perUserPerHour": 6,
+        "quietHours": [["23:30", "08:00"]],
+        "interject": {
+          "rate": 0.3,
+          "keywords": ["报错", "部署", "卡住了", "怎么弄"],
+          "threshold": 0.9
+        }
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "convKey": "qq:10001:group:*",
+      "agentId": "default",
+      "enabled": true
+    }
+  ],
+  "quota": {
+    "globalDailyCny": 20,
+    "bindingDailyCny": 2,
+    "onExceed": "notify"
+  },
+  "sendDelayMs": 1200
+}

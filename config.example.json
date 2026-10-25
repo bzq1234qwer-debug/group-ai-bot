@@ -1,0 +1,46 @@
+{
+  "mode": "live",
+  "logLevel": "info",
+  "dbPath": "data/bot.db",
+  "deepseek": {
+    "baseUrl": "https://api.deepseek.com",
+    "model": "deepseek-flash"
+  },
+  "channels": [
+    {
+      "id": "qq:10001",
+      "kind": "onebot11",
+      "label": "AI 小助手",
+      "selfId": "10001",
+      "baseUrl": "http://127.0.0.1:3000",
+      "eventPort": 3001,
+      "eventPath": "/onebot/events",
+      "eventToken": "换成你自己的随机串"
+    }
+  ],
+  "agents": [
+    {
+      "id": "default",
+      "name": "小D",
+      "persona": "你是群里的技术顾问，说话简短、口语化，最多三句话。不懂就说不懂，不要编。",
+      "model": "deepseek-flash",
+      "temperature": 1,
+      "maxOutputTokens": 800,
+      "thinking": false,
+      "maxContextTokens": 24000
+    }
+  ],
+  "bindings": [
+    {
+      "convKey": "qq:10001:group:30003",
+      "agentId": "default",
+      "enabled": true
+    }
+  ],
+  "quota": {
+    "globalDailyCny": 20,
+    "bindingDailyCny": 2,
+    "onExceed": "notify"
+  },
+  "sendDelayMs": 1200
+}
