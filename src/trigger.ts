@@ -130,7 +130,9 @@ function modeMatches(
       return rng() < (policy.randomRate ?? 0.05);
     case "interject":
       // 私聊不需要"插话判断"，对方就是在跟你说话
-      return priv || shouldInterject(env, { ...(policy.interject ?? {}), inConversation }, rng);
+      // 被直接 @ 也是明确在叫它，必须回，不能交给概率
+      if (priv || env.mentions.self) return true;
+      return shouldInterject(env, { ...(policy.interject ?? {}), inConversation }, rng);
     default:
       return false;
   }
@@ -261,7 +263,8 @@ export function evaluateTrigger(
   // 人均小时配额只用在群里：它的作用是防止一个人刷屏把额度吃光。
   // 私聊里对方每一句都是在跟它说话，套这个配额就会出现"聊到一半突然不理人"——
   // 用户只会认为它坏了。私聊的花费由日预算兜底。
-  if (!isPrivateConv(env)) {
+  // 被直接 @ 就是明确在问它：人均配额只用来防"闲聊刷屏",不该把点名提问挡掉
+  if (!isPrivateConv(env) && !env.mentions.self) {
     const counterKey = `${env.convKey}:${env.sender.id}`;
     const counter = state.userCounters.get(counterKey);
     if (counter && now - counter.windowStart < HOUR_MS && counter.count >= policy.perUserPerHour) {

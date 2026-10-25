@@ -111,13 +111,13 @@ test("random 模式受随机数与概率控制", () => {
 
 test("interject：普通陈述句不插话", () => {
   const p = policy({ mode: "interject", interject: { rate: 0.3 } });
-  const d = evaluateTrigger(makeEnv("今天天气不错"), p, state(), NOW, () => 0);
+  const d = evaluateTrigger(makeEnv("今天天气不错", { mentions: { self: false, users: [], all: false } }), p, state(), NOW, () => 0);
   assert.equal(d.respond, false);
 });
 
 test("interject：只有问号还不够，说明不是见问就抢答", () => {
   const p = policy({ mode: "interject", interject: { rate: 0.3 } });
-  assert.equal(evaluateTrigger(makeEnv("有人吗？"), p, state(), NOW, () => 0).respond, false);
+  assert.equal(evaluateTrigger(makeEnv("有人吗？", { mentions: { self: false, users: [], all: false } }), p, state(), NOW, () => 0).respond, false);
 });
 
 test("interject：问句 + 命中话题词才开口", () => {
@@ -125,7 +125,7 @@ test("interject：问句 + 命中话题词才开口", () => {
     mode: "interject",
     interject: { rate: 0.3, keywords: ["报错"] },
   });
-  assert.equal(evaluateTrigger(makeEnv("这个报错怎么修？"), p, state(), NOW, () => 0).respond, true);
+  assert.equal(evaluateTrigger(makeEnv("这个报错怎么修？", { mentions: { self: false, users: [], all: false } }), p, state(), NOW, () => 0).respond, true);
 });
 
 test("interject：命中话题词也会接话", () => {
@@ -133,13 +133,16 @@ test("interject：命中话题词也会接话", () => {
     mode: "interject",
     interject: { rate: 0.3, keywords: ["报错", "部署"] },
   });
-  assert.equal(evaluateTrigger(makeEnv("昨天部署又挂了"), p, state(), NOW, () => 0).respond, true);
-  assert.equal(evaluateTrigger(makeEnv("中午吃面"), p, state(), NOW, () => 0).respond, false);
+  assert.equal(evaluateTrigger(makeEnv("昨天部署又挂了", { mentions: { self: false, users: [], all: false } }), p, state(), NOW, () => 0).respond, true);
+  assert.equal(evaluateTrigger(makeEnv("中午吃面", { mentions: { self: false, users: [], all: false } }), p, state(), NOW, () => 0).respond, false);
 });
 
 test("interject：随机值很小时也压得住，不会见谁都接", () => {
   const p = policy({ mode: "interject", interject: { rate: 0.1, threshold: 1.4 } });
-  assert.equal(evaluateTrigger(makeEnv("随便说一句"), p, state(), NOW, () => 0.9).respond, false);
+  assert.equal(
+    evaluateTrigger(makeEnv("随便说一句", { mentions: { self: false, users: [], all: false } }), p, state(), NOW, () => 0.9).respond,
+    false,
+  );
 });
 
 test("冷却期：普通消息用完整冷却，@ 它只挡 3 秒", () => {
@@ -172,16 +175,19 @@ test("单用户每小时配额生效", () => {
   const p = policy({ mode: "always", cooldownSec: 0, perUserPerHour: 2 });
 
   for (let i = 0; i < 2; i += 1) {
-    assert.equal(evaluateTrigger(makeEnv(`第${i}次`), p, s, NOW + i * 1000).respond, true);
+    assert.equal(
+      evaluateTrigger(makeEnv(`第${i}次`, { mentions: { self: false, users: [], all: false } }), p, s, NOW + i * 1000).respond,
+      true,
+    );
     recordReply(s, "qq:10001:group:30003", "20002", NOW + i * 1000);
   }
 
-  const blocked = evaluateTrigger(makeEnv("第三次"), p, s, NOW + 3000);
+  const blocked = evaluateTrigger(makeEnv("第三次", { mentions: { self: false, users: [], all: false } }), p, s, NOW + 3000);
   assert.equal(blocked.respond, false);
   assert.equal(blocked.reason, "user_hourly_quota");
 
   // 一小时窗口过期后恢复
-  const later = evaluateTrigger(makeEnv("很久以后"), p, s, NOW + 3_600_001);
+  const later = evaluateTrigger(makeEnv("很久以后", { mentions: { self: false, users: [], all: false } }), p, s, NOW + 3_600_001);
   assert.equal(later.respond, true);
 });
 
@@ -215,13 +221,13 @@ test("私聊：不受人均小时配额限制（聊到一半突然不理人是 b
   }
 });
 
-test("群聊：人均小时配额照常生效", () => {
-  const policy: TriggerPolicy = { ...DEFAULT_TRIGGER, mode: "mention", cooldownSec: 0, perUserPerHour: 2 };
+test("群聊：非 @ 消息仍受人均配额限制", () => {
+  const policy: TriggerPolicy = { ...DEFAULT_TRIGGER, mode: "always", cooldownSec: 0, perUserPerHour: 2 };
   const state: TriggerState = createTriggerState();
   const now = Date.now();
-  const env = makeEnv("签到", {
+  const env = makeEnv("今天好热", {
     convKey: "qq:10001:group:30003",
-    mentions: { self: true, users: [], all: false },
+    mentions: { self: false, users: [], all: false },
   });
 
   const first = evaluateTrigger(env, policy, state, now);
@@ -235,4 +241,45 @@ test("群聊：人均小时配额照常生效", () => {
   const third = evaluateTrigger(env, policy, state, now + 2000);
   assert.equal(third.respond, false);
   assert.equal(third.reason, "user_hourly_quota");
+});
+test("插话模式：被 @ 必须回，不看概率", () => {
+  const policy: TriggerPolicy = { ...DEFAULT_TRIGGER, mode: "interject", cooldownSec: 0 };
+  const state = createTriggerState();
+  const now = Date.now();
+  const env = makeEnv("随便说点什么", {
+    convKey: "qq:10001:group:30003",
+    mentions: { self: true, users: [], all: false },
+  });
+
+  // rng 固定返回 0.99（必不中），被 @ 仍然要回
+  const alwaysMiss = () => 0.99;
+  const d = evaluateTrigger(env, policy, state, now, alwaysMiss as unknown as () => number);
+  assert.equal(d.respond, true, "@ 它是明确在叫它，不能被概率挡掉");
+});
+
+test("插话模式：没被 @ 的冷启动陈述句仍然按概率", () => {
+  const policy: TriggerPolicy = { ...DEFAULT_TRIGGER, mode: "interject", cooldownSec: 0 };
+  const state = createTriggerState();
+  const env = makeEnv("今天天气不错", {
+    convKey: "qq:10001:group:30003",
+    mentions: { self: false, users: [], all: false },
+  });
+  const d = evaluateTrigger(env, policy, state, Date.now(), () => 0.99);
+  assert.equal(d.respond, false);
+});
+
+test("群里被 @ 不受人均配额限制", () => {
+  const policy: TriggerPolicy = { ...DEFAULT_TRIGGER, mode: "interject", cooldownSec: 0, perUserPerHour: 2 };
+  const state = createTriggerState();
+  const now = Date.now();
+  const env = makeEnv("在吗", {
+    convKey: "qq:10001:group:30003",
+    mentions: { self: true, users: [], all: false },
+  });
+
+  for (let i = 0; i < 5; i += 1) {
+    const d = evaluateTrigger(env, policy, state, now + i * 5000, () => 0.99);
+    assert.equal(d.respond, true, `第 ${i + 1} 次 @ 应当回复`);
+    recordReply(state, env.convKey, env.sender.id, now + i * 5000);
+  }
 });
